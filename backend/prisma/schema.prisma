@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  PAID
+  FAILED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+enum RewardStatus {
+  WAITING
+  CLAIMABLE
+  CLAIMED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  phone        String   @unique
+  passwordHash String
+  referralCode String   @unique
+  referredById String?
+  createdAt    DateTime @default(now())
+
+  orders       Order[]
+  rewards      Reward[]
+  referrals    User[]   @relation("UserReferrals")
+  referredBy   User?    @relation("UserReferrals", fields: [referredById], references: [id])
+}
+
+model Product {
+  id          String   @id
+  name        String
+  description String
+  priceRwf    Int
+  rewardRwf   Int
+  imageUrl    String?
+  active      Boolean  @default(true)
+
+  orders      Order[]
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  userId         String
+  productId      String
+  quantity       Int
+  unitPriceRwf   Int
+  rewardUnitRwf  Int
+  totalRwf       Int
+  status         OrderStatus @default(PENDING)
+  provider       String
+  createdAt      DateTime    @default(now())
+  paidAt         DateTime?
+
+  user           User        @relation(fields: [userId], references: [id])
+  product        Product     @relation(fields: [productId], references: [id])
+  payment        Payment?
+  reward         Reward?
+
+  @@index([userId, createdAt])
+}
+
+model Payment {
+  id                String        @id @default(cuid())
+  orderId           String        @unique
+  provider          String
+  providerReference String?       @unique
+  status            PaymentStatus @default(PENDING)
+  requestedAt       DateTime      @default(now())
+  confirmedAt       DateTime?
+
+  order             Order         @relation(fields: [orderId], references: [id])
+}
+
+model Reward {
+  id          String       @id @default(cuid())
+  userId      String
+  orderId     String       @unique
+  amountRwf   Int
+  eligibleAt  DateTime
+  status      RewardStatus @default(WAITING)
+  claimedAt   DateTime?
+  createdAt   DateTime     @default(now())
+
+  user        User         @relation(fields: [userId], references: [id])
+  order       Order        @relation(fields: [orderId], references: [id])
+
+  @@index([userId, status])
+}
